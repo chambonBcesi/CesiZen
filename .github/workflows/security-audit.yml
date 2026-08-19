@@ -87,7 +87,7 @@ jobs:
           tags: cesizen-${{ matrix.image }}:audit
 
       - name: Scan Trivy - rapport complet (non bloquant, visible dans l'onglet Security)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: cesizen-${{ matrix.image }}:audit
           format: sarif
@@ -101,7 +101,7 @@ jobs:
           category: "trivy-${{ matrix.image }}"
 
       - name: Scan Trivy - porte bloquante (échoue uniquement sur criticité CRITICAL)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: cesizen-${{ matrix.image }}:audit
           format: table
