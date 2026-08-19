@@ -21,7 +21,7 @@ ENV VITE_API_URL=$VITE_API_URL
 RUN npm run build
 
 # ---------- Étape 2 : image finale, juste Nginx + fichiers statiques ----------
-FROM nginx:1.27-alpine
+FROM nginx:1.31-alpine
 
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
