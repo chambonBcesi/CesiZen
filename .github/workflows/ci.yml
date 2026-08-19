@@ -1,0 +1,36 @@
+name: CI - Lint et tests
+
+# Retour rapide sur toute branche : lint + tests unitaires backend/frontend.
+# Ne construit aucune image Docker et ne déploie rien — c'est le rôle de
+# security-audit.yml (staging) et deploy.yml (main).
+
+on:
+  push:
+    branches: [dev, staging, main]
+  pull_request:
+    branches: [dev, staging, main]
+
+jobs:
+  ci:
+    name: Lint et tests (backend + frontend)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Backend - installation et tests
+        working-directory: ./backend
+        run: |
+          npm ci
+          npm test --if-present
+
+      - name: Frontend - installation, lint, typecheck et build
+        working-directory: ./frontend
+        run: |
+          npm ci
+          npm run lint --if-present
+          npm run typecheck --if-present
+          npm run build

@@ -1,0 +1,104 @@
+name: Deploy Production - CESIZen
+
+# Seule "main" peut mettre à jour l'application finale de production.
+#
+# Le code qui arrive ici a déjà, en théorie, transité par "staging" et donc
+# par le portail security-audit.yml — c'est pourquoi ce workflow ne relance
+# pas les audits lourds, seulement un build + déploiement rapide. Le job
+# "test" ci-dessous reste un dernier filet de sécurité fonctionnel.
+#
+# Secrets nécessaires : PROD_HOST, PROD_USER, PROD_SSH_KEY, PROD_APP_PATH
+# Variable nécessaire : PROD_PUBLIC_URL   ex: http://<IP_DU_VPS>   (utilisée comme VITE_API_URL)
+
+on:
+  push:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  test:
+    name: Dernier filet - lint et tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+      - working-directory: ./backend
+        run: npm ci && npm test --if-present
+      - working-directory: ./frontend
+        run: npm ci && npm run build
+
+  build-and-push:
+    name: Build et publication des images (tag latest)
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Normaliser le nom du propriétaire (minuscules)
+        run: echo "IMAGE_OWNER=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build et push - image backend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/cesizen-backend:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/cesizen-backend:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build et push - image frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: true
+          build-args: |
+            VITE_API_URL=${{ vars.PROD_PUBLIC_URL }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/cesizen-frontend:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/cesizen-frontend:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Déploiement en production
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Déploiement via SSH (docker compose pull && up)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          script: |
+            set -e
+            cd ${{ secrets.PROD_APP_PATH }}
+            git fetch origin main
+            git checkout main 2>/dev/null || git checkout -b main origin/main
+            git reset --hard origin/main
+            docker compose -p cesizen --env-file .env pull
+            docker compose -p cesizen --env-file .env up -d
+            docker image prune -f
+
+      - name: Vérification post-déploiement (health check)
+        run: |
+          sleep 5
+          curl -f ${{ vars.PROD_PUBLIC_URL }}/api/health || exit 1

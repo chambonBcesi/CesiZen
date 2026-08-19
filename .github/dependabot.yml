@@ -1,0 +1,41 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/backend"
+    schedule:
+      interval: "daily"
+      time: "07:00"
+      timezone: "Europe/Paris"
+    open-pull-requests-limit: 10
+    labels: ["dependencies", "backend", "priorité:à-qualifier"]
+    commit-message:
+      prefix: "chore(deps-backend)"
+
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "daily"
+      time: "07:00"
+      timezone: "Europe/Paris"
+    open-pull-requests-limit: 10
+    labels: ["dependencies", "frontend", "priorité:à-qualifier"]
+    commit-message:
+      prefix: "chore(deps-frontend)"
+
+  - package-ecosystem: "docker"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+    labels: ["dependencies", "docker", "priorité:à-qualifier"]
+
+  - package-ecosystem: "docker"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+    labels: ["dependencies", "docker", "priorité:à-qualifier"]
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels: ["dependencies", "ci"]

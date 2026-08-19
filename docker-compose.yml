@@ -1,0 +1,78 @@
+# CESIZen - Stack Docker Compose
+# À placer à la racine du dépôt.
+#
+# Ce même fichier sert à la fois pour la production ET pour le staging : ce
+# qui les distingue, c'est le nom de projet Compose (-p) et le fichier
+# d'env chargé (--env-file), qui isolent complètement les conteneurs, le
+# réseau et les volumes des deux environnements sur le même VPS.
+#
+#   Production : docker compose -p cesizen          --env-file .env          pull && ... up -d
+#   Staging    : docker compose -p cesizen-staging  --env-file .env.staging  pull && ... up -d
+#
+# (voir .env.example / .env.staging.example ci-dessous — ne jamais committer
+# les .env réels)
+
+services:
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      # Exécuté automatiquement UNE SEULE FOIS, au tout premier démarrage
+      # (volume vide) : crée les tables + le compte admin par défaut.
+      - ./backend/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cesizen
+    # Pas de "ports:" exposé à l'hôte : la base n'est joignable que depuis
+    # le réseau interne Docker (réduction de la surface d'attaque).
+
+  backend:
+    image: ghcr.io/${GHCR_OWNER}/cesizen-backend:${IMAGE_TAG:-latest}
+    build:
+      context: ./backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      PORT: 3001
+      JWT_SECRET: ${JWT_SECRET}
+      CORS_ORIGIN: ${PUBLIC_URL}
+    networks:
+      - cesizen
+    # Pas de "ports:" exposé non plus : uniquement joignable via le reverse
+    # proxy du conteneur frontend (location /api/ -> http://backend:3001).
+
+  frontend:
+    image: ghcr.io/${GHCR_OWNER}/cesizen-frontend:${IMAGE_TAG:-latest}
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: ${PUBLIC_URL}
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+    networks:
+      - cesizen
+
+networks:
+  cesizen:
+
+volumes:
+  db_data:
