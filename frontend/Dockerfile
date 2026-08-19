@@ -3,7 +3,7 @@
 # À placer dans frontend/Dockerfile
 
 # ---------- Étape 1 : build de l'application React ----------
-FROM node:18-alpine AS build
+FROM node:26-alpine AS build
 WORKDIR /app
 
 COPY package*.json ./
