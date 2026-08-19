@@ -83,7 +83,7 @@ jobs:
     environment: production
     steps:
       - name: Déploiement via SSH (docker compose pull && up)
-        uses: appleboy/ssh-action@v1.0.3
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
