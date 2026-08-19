@@ -6,7 +6,7 @@
 # qui obligerait à recompiler depuis les sources (python3/make/g++) à chaque
 # build. En glibc, le binaire précompilé est téléchargé directement — build
 # plus rapide et plus fiable.
-FROM node:18-slim
+FROM node:26-slim
 
 WORKDIR /app
 
